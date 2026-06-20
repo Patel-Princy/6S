@@ -1,35 +1,46 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, ScrollView, TextInput, Alert, Image } from 'react-native';
 import { COLORS, SIZES } from '../theme/theme';
 import { useAppState } from '../context/AppStateContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { zonesData } from '../data/zones';
+import { launchCamera } from 'react-native-image-picker';
 
 export default function SubZonalDashboard({ route, navigation }) {
   const { loginId } = route.params || {};
   const { checklists, addChecklist, complaints } = useAppState();
   
-  // Mock logged in sub-zone
-  const subZoneInfo = zonesData[0].subZones[0]; // "Anviksha Ground Floor"
+  const subZoneInfo = zonesData[0].subZones[0]; // Mock
   
   const [activeTab, setActiveTab] = useState('DailyChecklist');
   const [remark, setRemark] = useState('');
-
-  // Mock states for concerns
   const [resolvedConcerns, setResolvedConcerns] = useState([]);
 
-  const handleResolveConcern = (concernId) => {
-    // In real app, we would upload to Firebase Storage, get URI, then update Firestore
+  const handleResolveConcern = async (concernId) => {
+    if (!remark) {
+      alert("Please add a comment to notify the user.");
+      return;
+    }
+    
+    // Simulate camera request
     Alert.alert(
-      "Upload Photo Proof",
-      "Choose a photo to upload for resolving this concern",
+      "Photo Proof Required",
+      "Please capture a photo to prove the concern is resolved.",
       [
         { text: "Cancel", style: "cancel" },
-        { text: "Upload & Resolve", onPress: () => {
-           setResolvedConcerns([...resolvedConcerns, concernId]);
-           alert('Concern resolved with photo proof and remark!');
-           setRemark('');
-        }}
+        { 
+          text: "Open Camera", 
+          onPress: async () => {
+             const result = await launchCamera({ mediaType: 'photo', cameraType: 'back' });
+             if (!result.didCancel && !result.errorCode) {
+               setResolvedConcerns([...resolvedConcerns, { id: concernId, remark, photo: result.assets[0].uri, timestamp: new Date().toLocaleString() }]);
+               alert('Concern resolved successfully!');
+               setRemark('');
+             } else {
+               alert('Photo capture cancelled. Proof is compulsory.');
+             }
+          }
+        }
       ]
     );
   };
@@ -78,15 +89,16 @@ export default function SubZonalDashboard({ route, navigation }) {
     }
 
     if (activeTab === 'FloorConcerns') {
-      const openConcerns = complaints.filter(c => c.status === 'open' && !resolvedConcerns.includes(c.id));
+      const openConcerns = complaints.filter(c => c.status === 'open' && !resolvedConcerns.find(r => r.id === c.id));
       return (
         <ScrollView style={styles.rightPanel}>
           <Text style={styles.contentTitle}>Pending Floor Concerns</Text>
           <Text style={styles.contentSubtitle}>Address issues raised by students.</Text>
-          {openConcerns.length === 0 ? <Text>No pending concerns.</Text> : null}
+          {openConcerns.length === 0 ? <Text style={{color: COLORS.textMuted}}>No pending concerns.</Text> : null}
           {openConcerns.map((c, i) => (
-             <View key={i} style={styles.historyCard}>
+             <View key={c.id || i} style={styles.historyCard}>
                <Text style={styles.historyText}>{c.description}</Text>
+               {c.photoUri && <Image source={{uri: c.photoUri}} style={styles.concernImage} />}
                <Text style={styles.metaText}>Raised: {c.reportedAt || 'Today'}</Text>
                
                <View style={styles.resolveBox}>
@@ -95,6 +107,7 @@ export default function SubZonalDashboard({ route, navigation }) {
                     value={remark}
                     onChangeText={setRemark}
                     placeholder="Add comments to notify the user..."
+                    placeholderTextColor={COLORS.textMuted}
                   />
                   <TouchableOpacity style={styles.resolveBtn} onPress={() => handleResolveConcern(c.id || i)}>
                     <Text style={styles.resolveBtnText}>Resolve & Upload Photo</Text>
@@ -121,17 +134,17 @@ export default function SubZonalDashboard({ route, navigation }) {
     }
 
     if (activeTab === 'ConcernsHistory') {
-      const resolved = complaints.filter(c => resolvedConcerns.includes(c.id));
       return (
         <ScrollView style={styles.rightPanel}>
           <Text style={styles.contentTitle}>Resolved Concerns History</Text>
-          {resolved.length === 0 ? <Text>No resolved concerns yet.</Text> : null}
-          {resolved.map((c, i) => (
+          {resolvedConcerns.length === 0 ? <Text style={{color: COLORS.textMuted}}>No resolved concerns yet.</Text> : null}
+          {resolvedConcerns.map((r, i) => (
              <View key={i} style={styles.historyCard}>
-               <Text style={styles.historyText}>{c.description}</Text>
+               <Text style={styles.historyText}>Resolution Comment: {r.remark}</Text>
+               {r.photo && <Image source={{uri: r.photo}} style={styles.concernImage} />}
                <View style={styles.metaRow}>
                  <Text style={styles.metaText}>Action: Resolved with photo</Text>
-                 <Text style={styles.metaText}>Time: {new Date().toLocaleString()}</Text>
+                 <Text style={styles.metaText}>Time: {r.timestamp}</Text>
                </View>
              </View>
           ))}
@@ -163,42 +176,44 @@ export default function SubZonalDashboard({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f6fa' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#dcdde1' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#2f3640' },
-  subtitle: { fontSize: 14, color: '#7f8fa6', marginTop: 4 },
-  logoutBtn: { backgroundColor: '#ffeaa7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, alignSelf: 'center' },
-  logoutText: { color: '#d35400', fontSize: 12, fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
+  title: { fontSize: 20, fontWeight: 'bold', color: COLORS.primary },
+  subtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
+  logoutBtn: { backgroundColor: COLORS.primaryDim, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, alignSelf: 'center' },
+  logoutText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
 
   mainContent: { flex: 1, flexDirection: 'row' },
   
-  leftPanel: { width: '30%', backgroundColor: '#fff', borderRightWidth: 1, borderColor: '#dcdde1', paddingVertical: 10 },
-  panelTitle: { fontSize: 14, fontWeight: 'bold', color: '#2f3640', marginLeft: 16, marginBottom: 10, textTransform: 'uppercase' },
-  szListItem: { padding: 12, paddingLeft: 16, borderBottomWidth: 1, borderColor: '#f5f6fa' },
-  szListItemActive: { backgroundColor: '#e1f5fe', borderRightWidth: 4, borderColor: '#3498db' },
-  szListText: { fontSize: 13, color: '#2f3640' },
-  szListTextActive: { fontWeight: 'bold', color: '#2980b9' },
+  leftPanel: { width: '30%', backgroundColor: COLORS.surface, borderRightWidth: 1, borderColor: COLORS.border, paddingVertical: 10 },
+  panelTitle: { fontSize: 14, fontWeight: 'bold', color: COLORS.primary, marginLeft: 16, marginBottom: 10, textTransform: 'uppercase' },
+  szListItem: { padding: 12, paddingLeft: 16, borderBottomWidth: 1, borderColor: COLORS.border },
+  szListItemActive: { backgroundColor: COLORS.primaryDim, borderRightWidth: 4, borderColor: COLORS.primary },
+  szListText: { fontSize: 13, color: COLORS.text },
+  szListTextActive: { fontWeight: 'bold', color: COLORS.primary },
 
   rightPanel: { flex: 1, padding: 16 },
-  contentTitle: { fontSize: 22, fontWeight: 'bold', color: '#2f3640', marginBottom: 4 },
-  contentSubtitle: { fontSize: 14, color: '#7f8fa6', marginBottom: 20 },
+  contentTitle: { fontSize: 22, fontWeight: 'bold', color: COLORS.text, marginBottom: 4 },
+  contentSubtitle: { fontSize: 14, color: COLORS.textMuted, marginBottom: 20 },
 
-  card: { backgroundColor: '#fff', padding: 16, borderRadius: 8, elevation: 1, marginBottom: 16 },
-  cardHeader: { fontSize: 16, fontWeight: 'bold', color: '#2f3640', marginBottom: 12 },
+  card: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 8, elevation: 1, marginBottom: 16, borderWidth: 1, borderColor: COLORS.border },
+  cardHeader: { fontSize: 16, fontWeight: 'bold', color: COLORS.primary, marginBottom: 12 },
   
-  button: { backgroundColor: '#2ecc71', padding: 12, borderRadius: 4, alignItems: 'center' },
-  buttonText: { color: '#fff', fontWeight: 'bold' },
+  button: { backgroundColor: COLORS.success, padding: 12, borderRadius: 4, alignItems: 'center' },
+  buttonText: { color: COLORS.surface, fontWeight: 'bold' },
 
-  historyCard: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 12, elevation: 1 },
-  historyText: { fontSize: 14, color: '#2f3640', marginBottom: 8 },
-  historyDate: { fontSize: 14, fontWeight: '600', color: '#2f3640' },
-  historyStatus: { fontSize: 12, color: '#2ecc71', marginTop: 4 },
+  historyCard: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 8, marginBottom: 12, elevation: 1, borderWidth: 1, borderColor: COLORS.border },
+  historyText: { fontSize: 14, color: COLORS.text, marginBottom: 8 },
+  historyDate: { fontSize: 14, fontWeight: '600', color: COLORS.text },
+  historyStatus: { fontSize: 12, color: COLORS.success, marginTop: 4 },
   
-  resolveBox: { marginTop: 12, borderTopWidth: 1, borderColor: '#ecf0f1', paddingTop: 12 },
-  input: { width: '100%', height: 40, backgroundColor: '#f5f6fa', borderWidth: 1, borderColor: '#dcdde1', borderRadius: 4, paddingHorizontal: 12, marginBottom: 8 },
-  resolveBtn: { backgroundColor: '#3498db', padding: 10, borderRadius: 4, alignItems: 'center' },
-  resolveBtnText: { color: '#fff', fontWeight: 'bold', fontSize: 12 },
+  concernImage: { width: '100%', height: 150, borderRadius: 8, marginVertical: 8, backgroundColor: '#eee' },
+
+  resolveBox: { marginTop: 12, borderTopWidth: 1, borderColor: COLORS.border, paddingTop: 12 },
+  input: { width: '100%', height: 40, backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: 4, paddingHorizontal: 12, marginBottom: 8, color: COLORS.text },
+  resolveBtn: { backgroundColor: COLORS.primary, padding: 10, borderRadius: 4, alignItems: 'center' },
+  resolveBtnText: { color: COLORS.surface, fontWeight: 'bold', fontSize: 12 },
 
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginTop: 8 },
-  metaText: { fontSize: 11, color: '#7f8fa6' }
+  metaText: { fontSize: 11, color: COLORS.textMuted }
 });

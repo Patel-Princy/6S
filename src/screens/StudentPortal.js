@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Platform } from 'react-native';
+import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Alert, Image } from 'react-native';
 import { COLORS, SIZES } from '../theme/theme';
 import { useAppState } from '../context/AppStateContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { zonesData, getSubZonesForZone } from '../data/zones';
+import { launchCamera } from 'react-native-image-picker';
 
 export default function StudentPortal({ route, navigation }) {
   const { loginId } = route.params || {};
@@ -13,12 +14,36 @@ export default function StudentPortal({ route, navigation }) {
   const [description, setDescription] = useState('');
   const [selectedZone, setSelectedZone] = useState('zone_1');
   const [selectedSubZone, setSelectedSubZone] = useState('');
+  const [photoUri, setPhotoUri] = useState(null);
 
   const myConcerns = complaints.filter(c => c.reportedBy === (loginId || 'student_unknown'));
 
+  const handleCapturePhoto = async () => {
+    Alert.alert(
+      "Camera Access",
+      "Camera access is compulsory to capture and submit a concern.",
+      [
+        { text: "Cancel", style: "cancel" },
+        { 
+          text: "Open Camera", 
+          onPress: async () => {
+             const result = await launchCamera({ mediaType: 'photo', cameraType: 'back' });
+             if (!result.didCancel && !result.errorCode && result.assets) {
+               setPhotoUri(result.assets[0].uri);
+             }
+          }
+        }
+      ]
+    );
+  };
+
   const handleSubmit = () => {
     if (!description.trim() || !selectedSubZone) {
-       alert("Please fill description and select a sub-zone");
+       alert("Please fill description and select a sub-zone.");
+       return;
+    }
+    if (!photoUri) {
+       alert("Photo proof is COMPULSORY. Please tap 'Capture Photo Evidence' to take a photo of the concern.");
        return;
     }
     
@@ -28,10 +53,12 @@ export default function StudentPortal({ route, navigation }) {
       subZone: selectedSubZone,
       reportedBy: loginId || 'student_unknown',
       reportedAt: new Date().toLocaleString(),
-      status: 'open'
+      status: 'open',
+      photoUri: photoUri
     });
     
     setDescription('');
+    setPhotoUri(null);
     alert('Issue reported successfully!');
     setActiveTab('MyConcerns');
   };
@@ -67,9 +94,19 @@ export default function StudentPortal({ route, navigation }) {
         numberOfLines={4}
       />
 
-      <TouchableOpacity style={styles.mockUpload}>
-        <Text style={styles.mockUploadText}>+ Upload Photo Evidence</Text>
-      </TouchableOpacity>
+      <Text style={styles.label}>Compulsory Photo Evidence</Text>
+      {photoUri ? (
+        <View style={styles.imagePreviewContainer}>
+          <Image source={{ uri: photoUri }} style={styles.imagePreview} />
+          <TouchableOpacity style={styles.retakeButton} onPress={handleCapturePhoto}>
+            <Text style={styles.retakeButtonText}>Retake Photo</Text>
+          </TouchableOpacity>
+        </View>
+      ) : (
+        <TouchableOpacity style={styles.mockUpload} onPress={handleCapturePhoto}>
+          <Text style={styles.mockUploadText}>+ Capture Photo Evidence (Required)</Text>
+        </TouchableOpacity>
+      )}
 
       <TouchableOpacity style={styles.button} onPress={handleSubmit}>
         <Text style={styles.buttonText}>Submit Report</Text>
@@ -83,6 +120,7 @@ export default function StudentPortal({ route, navigation }) {
       {myConcerns.map((c, i) => (
         <View key={i} style={styles.historyCard}>
           <Text style={styles.historyText}>{c.description}</Text>
+          {c.photoUri && <Image source={{ uri: c.photoUri }} style={styles.imagePreview} />}
           <View style={styles.metaRow}>
             <Text style={styles.metaText}>Zone: {c.zone} | Sub: {c.subZone}</Text>
             <Text style={styles.metaText}>Time: {c.reportedAt}</Text>
@@ -94,10 +132,7 @@ export default function StudentPortal({ route, navigation }) {
             </Text>
             {c.status !== 'open' && (
               <View style={{marginTop: 8}}>
-                 <Text style={{fontSize: 12, color: COLORS.text}}>Sub-Zonal Remark: "Issue has been resolved and cleaned."</Text>
-                 <View style={styles.mockPhotoProof}>
-                   <Text style={{fontSize: 10, color: COLORS.textMuted}}>Photo Proof Attached</Text>
-                 </View>
+                 <Text style={{fontSize: 12, color: COLORS.text}}>Sub-Zonal Remark: "Issue has been resolved."</Text>
               </View>
             )}
           </View>
@@ -135,44 +170,48 @@ export default function StudentPortal({ route, navigation }) {
 }
 
 const styles = StyleSheet.create({
-  container: { flex: 1, backgroundColor: '#f5f6fa' },
-  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#dcdde1' },
-  title: { fontSize: 20, fontWeight: 'bold', color: '#2f3640' },
-  subtitle: { fontSize: 14, color: '#7f8fa6', marginTop: 4 },
-  logoutBtn: { backgroundColor: '#ffeaa7', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, alignSelf: 'center' },
-  logoutText: { color: '#d35400', fontSize: 12, fontWeight: 'bold' },
+  container: { flex: 1, backgroundColor: COLORS.background },
+  header: { flexDirection: 'row', justifyContent: 'space-between', padding: 16, backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
+  title: { fontSize: 20, fontWeight: 'bold', color: COLORS.primary },
+  subtitle: { fontSize: 14, color: COLORS.textMuted, marginTop: 4 },
+  logoutBtn: { backgroundColor: COLORS.primaryDim, paddingHorizontal: 12, paddingVertical: 8, borderRadius: 4, alignSelf: 'center' },
+  logoutText: { color: COLORS.primary, fontSize: 12, fontWeight: 'bold' },
 
-  tabsRow: { flexDirection: 'row', backgroundColor: '#fff', borderBottomWidth: 1, borderColor: '#dcdde1' },
+  tabsRow: { flexDirection: 'row', backgroundColor: COLORS.surface, borderBottomWidth: 1, borderColor: COLORS.border },
   tab: { flex: 1, paddingVertical: 12, alignItems: 'center' },
-  tabActive: { borderBottomWidth: 3, borderBottomColor: '#3498db' },
-  tabText: { color: '#7f8fa6', fontWeight: 'bold' },
-  tabTextActive: { color: '#3498db' },
+  tabActive: { borderBottomWidth: 3, borderBottomColor: COLORS.primary },
+  tabText: { color: COLORS.textMuted, fontWeight: 'bold' },
+  tabTextActive: { color: COLORS.primary },
 
   scroll: { padding: 16 },
 
-  card: { backgroundColor: '#fff', padding: 20, borderRadius: 8, elevation: 1 },
-  label: { fontSize: 14, fontWeight: 'bold', color: '#2f3640', marginBottom: 8, marginTop: 16 },
+  card: { backgroundColor: COLORS.surface, padding: 20, borderRadius: 8, elevation: 1, borderWidth: 1, borderColor: COLORS.border },
+  label: { fontSize: 14, fontWeight: 'bold', color: COLORS.text, marginBottom: 8, marginTop: 16 },
   
   filterRow: { flexDirection: 'row', marginBottom: 8 },
-  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: '#bdc3c7', marginRight: 8, height: 32 },
-  filterChipActive: { backgroundColor: '#3498db', borderColor: '#3498db' },
-  filterChipText: { fontSize: 12, color: '#7f8c8d' },
-  filterChipTextActive: { color: '#fff', fontWeight: 'bold' },
+  filterChip: { paddingHorizontal: 12, paddingVertical: 6, borderRadius: 16, borderWidth: 1, borderColor: COLORS.border, marginRight: 8, height: 32 },
+  filterChipActive: { backgroundColor: COLORS.primary, borderColor: COLORS.primary },
+  filterChipText: { fontSize: 12, color: COLORS.textMuted },
+  filterChipTextActive: { color: COLORS.surface, fontWeight: 'bold' },
 
-  input: { width: '100%', backgroundColor: '#f5f6fa', borderWidth: 1, borderColor: '#dcdde1', borderRadius: 4, paddingHorizontal: 16, fontSize: 14, color: '#2f3640' },
+  input: { width: '100%', backgroundColor: COLORS.background, borderWidth: 1, borderColor: COLORS.border, borderRadius: 4, paddingHorizontal: 16, fontSize: 14, color: COLORS.text },
   textArea: { paddingTop: 16, height: 100, textAlignVertical: 'top' },
 
-  mockUpload: { width: '100%', height: 80, borderWidth: 2, borderColor: '#bdc3c7', borderStyle: 'dashed', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginTop: 20, marginBottom: 24, backgroundColor: '#f5f6fa' },
-  mockUploadText: { color: '#7f8c8d', fontWeight: 'bold' },
+  mockUpload: { width: '100%', height: 80, borderWidth: 2, borderColor: COLORS.primaryDim, borderStyle: 'dashed', borderRadius: 4, justifyContent: 'center', alignItems: 'center', marginTop: 8, marginBottom: 24, backgroundColor: COLORS.background },
+  mockUploadText: { color: COLORS.primary, fontWeight: 'bold' },
   
-  button: { width: '100%', height: 45, backgroundColor: '#3498db', justifyContent: 'center', alignItems: 'center', borderRadius: 4 },
-  buttonText: { color: '#fff', fontSize: 16, fontWeight: 'bold' },
+  imagePreviewContainer: { marginBottom: 24, marginTop: 8 },
+  imagePreview: { width: '100%', height: 150, borderRadius: 8, backgroundColor: '#eee', marginBottom: 8 },
+  retakeButton: { alignSelf: 'flex-start', padding: 8, backgroundColor: COLORS.primaryDim, borderRadius: 4 },
+  retakeButtonText: { color: COLORS.primary, fontWeight: 'bold', fontSize: 12 },
 
-  historyCard: { backgroundColor: '#fff', padding: 16, borderRadius: 8, marginBottom: 12, elevation: 1 },
-  historyText: { fontSize: 14, color: '#2f3640', marginBottom: 12 },
+  button: { width: '100%', height: 45, backgroundColor: COLORS.primary, justifyContent: 'center', alignItems: 'center', borderRadius: 4 },
+  buttonText: { color: COLORS.surface, fontSize: 16, fontWeight: 'bold' },
+
+  historyCard: { backgroundColor: COLORS.surface, padding: 16, borderRadius: 8, marginBottom: 12, elevation: 1, borderWidth: 1, borderColor: COLORS.border },
+  historyText: { fontSize: 14, color: COLORS.text, marginBottom: 12 },
   metaRow: { flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 },
-  metaText: { fontSize: 11, color: '#7f8fa6' },
-  statusBox: { borderTopWidth: 1, borderColor: '#ecf0f1', paddingTop: 8, marginTop: 4 },
-  mockPhotoProof: { width: 60, height: 60, backgroundColor: '#ecf0f1', justifyContent: 'center', alignItems: 'center', marginTop: 8, borderRadius: 4 },
-  emptyText: { textAlign: 'center', color: '#7f8fa6', marginTop: 20 }
+  metaText: { fontSize: 11, color: COLORS.textMuted },
+  statusBox: { borderTopWidth: 1, borderColor: COLORS.border, paddingTop: 8, marginTop: 4 },
+  emptyText: { textAlign: 'center', color: COLORS.textMuted, marginTop: 20 }
 });
