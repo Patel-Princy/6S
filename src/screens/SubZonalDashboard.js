@@ -4,7 +4,7 @@ import { COLORS, SIZES } from '../theme/theme';
 import { useAppState } from '../context/AppStateContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { zonesData } from '../data/zones';
-import { launchCamera } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SubZonalDashboard({ route, navigation }) {
   const { loginId } = route.params || {};
@@ -31,8 +31,16 @@ export default function SubZonalDashboard({ route, navigation }) {
         { 
           text: "Open Camera", 
           onPress: async () => {
-             const result = await launchCamera({ mediaType: 'photo', cameraType: 'back' });
-             if (!result.didCancel && !result.errorCode) {
+             const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+             if (permissionResult.granted === false) {
+               alert("Camera permission is required!");
+               return;
+             }
+             const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 1,
+             });
+             if (!result.canceled && result.assets) {
                setResolvedConcerns([...resolvedConcerns, { id: concernId, remark, photo: result.assets[0].uri, timestamp: new Date().toLocaleString() }]);
                alert('Concern resolved successfully!');
                setRemark('');

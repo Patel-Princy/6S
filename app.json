@@ -1,4 +1,31 @@
 {
-  "name": "GSFCU6SMonitor",
-  "displayName": "GSFCU6SMonitor"
+  "expo": {
+    "name": "GSFCU6SMonitor",
+    "slug": "gsfcu-6s-monitor",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./src/assets/campus_map.png",
+    "userInterfaceStyle": "light",
+    "splash": {
+      "image": "./src/assets/campus_map.png",
+      "resizeMode": "contain",
+      "backgroundColor": "#ffffff"
+    },
+    "assetBundlePatterns": [
+      "**/*"
+    ],
+    "ios": {
+      "supportsTablet": true
+    },
+    "android": {
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/campus_map.png",
+        "backgroundColor": "#ffffff"
+      },
+      "package": "com.gsfcu.6smonitor"
+    },
+    "web": {
+      "favicon": "./src/assets/campus_map.png"
+    }
+  }
 }

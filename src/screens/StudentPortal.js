@@ -4,7 +4,7 @@ import { COLORS, SIZES } from '../theme/theme';
 import { useAppState } from '../context/AppStateContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { zonesData, getSubZonesForZone } from '../data/zones';
-import { launchCamera } from 'react-native-image-picker';
+import * as ImagePicker from 'expo-image-picker';
 
 export default function StudentPortal({ route, navigation }) {
   const { loginId } = route.params || {};
@@ -27,8 +27,16 @@ export default function StudentPortal({ route, navigation }) {
         { 
           text: "Open Camera", 
           onPress: async () => {
-             const result = await launchCamera({ mediaType: 'photo', cameraType: 'back' });
-             if (!result.didCancel && !result.errorCode && result.assets) {
+             const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+             if (permissionResult.granted === false) {
+               alert("Camera permission is required!");
+               return;
+             }
+             const result = await ImagePicker.launchCameraAsync({
+                mediaTypes: ['images'],
+                quality: 1,
+             });
+             if (!result.canceled && result.assets) {
                setPhotoUri(result.assets[0].uri);
              }
           }
